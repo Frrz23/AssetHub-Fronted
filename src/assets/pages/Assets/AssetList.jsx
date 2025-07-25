@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { approveAsset, deactivateAsset, deleteAsset, getAssets } from "../../../services/assetService";
+import { 
+  approveAsset, 
+  deactivateAsset, 
+  reactivateAsset, // ← Add this import
+  deleteAsset, 
+  getAssets 
+} from "../../../services/assetService";
 import { 
   CheckCircle, 
   Clock, 
@@ -83,15 +89,46 @@ const AssetList = () => {
     }
   };
 
-  // Filter and search logic
-  const filteredAssets = assets.filter(asset => {
-    const matchesFilter = 
-      filter === 'all' || 
-      (filter === 'approved' && asset.isApproved) ||
-      (filter === 'pending' && !asset.isApproved) ||
-      (filter === 'active' && asset.isActive) ||
-      (filter === 'inactive' && !asset.isActive);
+  const handleReactivate = async (id) => {
+    if (!window.confirm("Are you sure you want to reactivate this asset?")) return;
     
+    setProcessingAssetId(id);
+    try {
+      await reactivateAsset(id);
+      await fetchAssets();
+    } catch (error) {
+      console.error("Reactivate error:", error);
+      alert("❌ Reactivate failed: " + (error.response?.data?.message || error.message));
+    } finally {
+      setProcessingAssetId(null);
+    }
+  };
+
+  const filteredAssets = assets.filter(asset => {
+    // Filter logic
+    let matchesFilter = false;
+    
+    switch(filter) {
+      case 'all':
+        matchesFilter = true; // Show all assets
+        break;
+      case 'approved':
+        matchesFilter = asset.isApproved === true; // Only approved assets
+        break;
+      case 'pending':
+        matchesFilter = asset.isApproved === false; // Only pending (not approved) assets
+        break;
+      case 'active':
+        matchesFilter = asset.isApproved === true && asset.isActive === true; // Approved AND active
+        break;
+      case 'inactive':
+        matchesFilter = asset.isApproved === true && asset.isActive === false; // Approved but NOT active (deactivated)
+        break;
+      default:
+        matchesFilter = true;
+    }
+    
+    // Search logic
     const matchesSearch = 
       asset.assetName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       asset.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -304,6 +341,21 @@ const AssetList = () => {
                               <Ban className="w-4 h-4" />
                             )}
                             Deactivate
+                          </button>
+                        )}
+
+                        {asset.isApproved && !asset.isActive && (
+                          <button
+                            onClick={() => handleReactivate(asset.id)}
+                            disabled={processingAssetId === asset.id}
+                            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                          >
+                            {processingAssetId === asset.id ? (
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <CheckCircle className="w-4 h-4" />
+                            )}
+                            Reactivate
                           </button>
                         )}
 
